@@ -187,6 +187,13 @@ export const DOTVERIFY_ABI = [
     inputs: [{ name: "data", type: "bytes" }],
     outputs: [{ name: "", type: "bytes32" }],
   },
+  {
+    name: "getCodeHash",
+    type: "function",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "bytes32" }],
+  },
   // Events
   {
     name: "SchemaRegistered",

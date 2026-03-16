@@ -1,0 +1,27 @@
+# env/secrets
+.env
+.env.local
+contracts/.env
+
+# deps
+node_modules/
+frontend/node_modules/
+
+# build
+.next/
+frontend/.next/
+contracts/out/
+contracts/cache/
+contracts/broadcast/
+
+# foundry libs (installed via forge install)
+lib/
+contracts/lib/
+
+# foundry lock files
+foundry.lock
+contracts/foundry.lock
+
+# misc
+.DS_Store
+*.log

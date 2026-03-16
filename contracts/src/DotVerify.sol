@@ -8,11 +8,17 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 
+/// @title ISchemaResolver — Optional hook contract called on attest/revoke
+interface ISchemaResolver {
+    function onAttest(bytes32 attestationUid, address issuer, address recipient, bytes calldata data) external returns (bool);
+    function onRevoke(bytes32 attestationUid, address revoker) external returns (bool);
+}
+
 /// @title DotVerify — On-chain Attestation & Credential Verification for Polkadot Hub
-/// @notice EAS-style attestation protocol with PVM-native precompile integration
-/// @dev Uses BLAKE2 for attestation hashing, sr25519 for Substrate issuer auth,
-///      XCM for cross-chain attestation queries, ecdsaToEthAddress for identity.
-///      These features are impossible on standard EVM — they require PVM.
+/// @notice Full EAS-equivalent attestation protocol with deep PVM precompile integration.
+///         Schema resolvers, delegated attestations, batch ops, issuer registry, BLAKE2/sr25519/XCM.
+/// @dev Leverages ALL Polkadot Hub precompiles: IXcm (0xA0000) send/execute/weighMessage,
+///      ISystem (0x900) sr25519Verify/BLAKE2/weightLeft/callerIsOrigin/ecdsaToEthAddress/toAccountId.
 contract DotVerify is Ownable, ReentrancyGuard, Pausable {
     IXcm public constant xcm = IXcm(XCM_PRECOMPILE_ADDRESS);
     ISystem public constant system = ISystem(SYSTEM_ADDR);
@@ -20,31 +26,33 @@ contract DotVerify is Ownable, ReentrancyGuard, Pausable {
     constructor() Ownable(msg.sender) {}
 
     // =========================================================================
-    // Schema Registry
+    // Schema Registry (with Resolvers)
     // =========================================================================
 
     struct Schema {
         bytes32 uid;
         address creator;
         string name;
-        string definition; // field:type pairs, e.g. "name:string,degree:string,date:uint256"
+        string definition;       // field:type pairs
         bool revocable;
+        address resolver;        // optional resolver contract (address(0) = none)
         uint256 createdAt;
     }
 
     mapping(bytes32 => Schema) public schemas;
     bytes32[] public allSchemaUids;
 
-    event SchemaRegistered(bytes32 indexed uid, address indexed creator, string name);
+    event SchemaRegistered(bytes32 indexed uid, address indexed creator, string name, address resolver);
 
-    /// @notice Register a new attestation schema
-    /// @dev UID is BLAKE2-256 of (creator, name, definition) — PVM-native hash, not keccak256
+    /// @notice Register a schema with optional resolver hook
+    /// @dev UID = BLAKE2-256(creator, name, definition, resolver) — PVM-native hash
     function registerSchema(
         string calldata name,
         string calldata definition,
-        bool revocable
+        bool revocable,
+        address resolver
     ) external whenNotPaused returns (bytes32 uid) {
-        uid = system.hashBlake256(abi.encodePacked(msg.sender, name, definition));
+        uid = system.hashBlake256(abi.encodePacked(msg.sender, name, definition, resolver));
         require(schemas[uid].createdAt == 0, "schema already exists");
 
         schemas[uid] = Schema({
@@ -53,11 +61,35 @@ contract DotVerify is Ownable, ReentrancyGuard, Pausable {
             name: name,
             definition: definition,
             revocable: revocable,
+            resolver: resolver,
             createdAt: block.timestamp
         });
         allSchemaUids.push(uid);
 
-        emit SchemaRegistered(uid, msg.sender, name);
+        emit SchemaRegistered(uid, msg.sender, name, resolver);
+    }
+
+    /// @notice Register a schema without resolver (convenience overload)
+    function registerSchema(
+        string calldata name,
+        string calldata definition,
+        bool revocable
+    ) external whenNotPaused returns (bytes32 uid) {
+        uid = system.hashBlake256(abi.encodePacked(msg.sender, name, definition, address(0)));
+        require(schemas[uid].createdAt == 0, "schema already exists");
+
+        schemas[uid] = Schema({
+            uid: uid,
+            creator: msg.sender,
+            name: name,
+            definition: definition,
+            revocable: revocable,
+            resolver: address(0),
+            createdAt: block.timestamp
+        });
+        allSchemaUids.push(uid);
+
+        emit SchemaRegistered(uid, msg.sender, name, address(0));
     }
 
     function getSchema(bytes32 uid) external view returns (Schema memory) {
@@ -74,6 +106,55 @@ contract DotVerify is Ownable, ReentrancyGuard, Pausable {
     }
 
     // =========================================================================
+    // Trusted Issuer Registry (PVM-native identity)
+    // =========================================================================
+
+    struct Issuer {
+        bool registered;
+        string name;
+        bytes32 substrateAccountId;  // Polkadot-native identity via toAccountId
+        bytes32 codeHashAtRegistration;  // contract integrity snapshot
+        uint256 attestationsMade;
+        uint256 registeredAt;
+    }
+
+    mapping(address => Issuer) public issuers;
+    address[] public allIssuers;
+
+    event IssuerRegistered(address indexed issuer, string name, bytes32 substrateId);
+
+    /// @notice Register as a trusted issuer with PVM identity binding
+    /// @dev Resolves EVM address to Substrate AccountId32 via toAccountId precompile,
+    ///      captures contract code hash for integrity verification
+    function registerIssuer(string calldata name) external whenNotPaused {
+        require(!issuers[msg.sender].registered, "already registered");
+
+        bytes memory accountIdBytes = system.toAccountId(msg.sender);
+        bytes32 substrateId;
+        assembly { substrateId := mload(add(accountIdBytes, 32)) }
+
+        issuers[msg.sender] = Issuer({
+            registered: true,
+            name: name,
+            substrateAccountId: substrateId,
+            codeHashAtRegistration: system.ownCodeHash(),
+            attestationsMade: 0,
+            registeredAt: block.timestamp
+        });
+        allIssuers.push(msg.sender);
+
+        emit IssuerRegistered(msg.sender, name, substrateId);
+    }
+
+    function getIssuer(address addr) external view returns (Issuer memory) {
+        return issuers[addr];
+    }
+
+    function getIssuerCount() external view returns (uint256) {
+        return allIssuers.length;
+    }
+
+    // =========================================================================
     // Attestation Core
     // =========================================================================
 
@@ -82,47 +163,52 @@ contract DotVerify is Ownable, ReentrancyGuard, Pausable {
         bytes32 schemaUid;
         address issuer;
         address recipient;
-        bytes data;          // ABI-encoded attestation data
+        bytes data;
+        bytes32 dataHash;        // BLAKE2-256 of raw data for integrity
         uint256 issuedAt;
-        uint256 expiresAt;   // 0 = never expires
+        uint256 expiresAt;
         bool revoked;
-        bytes32 refUid;      // optional reference to another attestation
+        bytes32 refUid;
     }
 
     mapping(bytes32 => Attestation) public attestations;
-    mapping(address => bytes32[]) public receivedAttestations;  // recipient -> uids
-    mapping(address => bytes32[]) public issuedAttestations;    // issuer -> uids
-    mapping(bytes32 => bytes32[]) public schemaAttestations;    // schema -> uids
-    mapping(bytes32 => bool) public usedSignatures;             // replay prevention
+    mapping(address => bytes32[]) public receivedAttestations;
+    mapping(address => bytes32[]) public issuedAttestations;
+    mapping(bytes32 => bytes32[]) public schemaAttestations;
+    mapping(bytes32 => bool) public usedSignatures;
     uint256 public attestationCount;
 
     event AttestationCreated(bytes32 indexed uid, bytes32 indexed schemaUid, address indexed issuer, address recipient);
     event AttestationRevoked(bytes32 indexed uid, address indexed revoker);
     event Sr25519AttestationIssued(bytes32 indexed uid, bytes32 indexed publicKey);
+    event DelegatedAttestationIssued(bytes32 indexed uid, address indexed delegator, address indexed issuer);
     event XcmAttestationQuery(bytes32 indexed uid, bytes destination);
 
-    /// @notice Issue an attestation under a registered schema
-    /// @dev UID is BLAKE2-256 of (schemaUid, issuer, recipient, data, timestamp, nonce)
-    function attest(
+    /// @dev Internal attestation logic shared by all attest variants
+    function _attest(
         bytes32 schemaUid,
+        address issuer,
         address recipient,
         bytes calldata data,
         uint256 expiresAt,
         bytes32 refUid
-    ) external whenNotPaused returns (bytes32 uid) {
+    ) internal returns (bytes32 uid) {
         require(schemas[schemaUid].createdAt > 0, "schema not found");
         require(expiresAt == 0 || expiresAt > block.timestamp, "already expired");
 
+        // BLAKE2-256 for UID generation and data integrity
         uid = system.hashBlake256(
-            abi.encodePacked(schemaUid, msg.sender, recipient, data, block.timestamp, attestationCount)
+            abi.encodePacked(schemaUid, issuer, recipient, data, block.timestamp, attestationCount)
         );
+        bytes32 dataHash = system.hashBlake256(data);
 
         attestations[uid] = Attestation({
             uid: uid,
             schemaUid: schemaUid,
-            issuer: msg.sender,
+            issuer: issuer,
             recipient: recipient,
             data: data,
+            dataHash: dataHash,
             issuedAt: block.timestamp,
             expiresAt: expiresAt,
             revoked: false,
@@ -130,11 +216,36 @@ contract DotVerify is Ownable, ReentrancyGuard, Pausable {
         });
 
         receivedAttestations[recipient].push(uid);
-        issuedAttestations[msg.sender].push(uid);
+        issuedAttestations[issuer].push(uid);
         schemaAttestations[schemaUid].push(uid);
         attestationCount++;
 
-        emit AttestationCreated(uid, schemaUid, msg.sender, recipient);
+        // Update issuer stats
+        if (issuers[issuer].registered) {
+            issuers[issuer].attestationsMade++;
+        }
+
+        // Call resolver if schema has one
+        Schema storage s = schemas[schemaUid];
+        if (s.resolver != address(0)) {
+            require(
+                ISchemaResolver(s.resolver).onAttest(uid, issuer, recipient, data),
+                "resolver rejected attestation"
+            );
+        }
+
+        emit AttestationCreated(uid, schemaUid, issuer, recipient);
+    }
+
+    /// @notice Issue an attestation
+    function attest(
+        bytes32 schemaUid,
+        address recipient,
+        bytes calldata data,
+        uint256 expiresAt,
+        bytes32 refUid
+    ) external whenNotPaused returns (bytes32 uid) {
+        return _attest(schemaUid, msg.sender, recipient, data, expiresAt, refUid);
     }
 
     /// @notice Issue attestation with callerIsOrigin verification (blocks proxy attacks)
@@ -146,35 +257,12 @@ contract DotVerify is Ownable, ReentrancyGuard, Pausable {
         bytes32 refUid
     ) external whenNotPaused returns (bytes32 uid) {
         require(system.callerIsOrigin(), "DotVerify: must be direct caller");
-        require(schemas[schemaUid].createdAt > 0, "schema not found");
-        require(expiresAt == 0 || expiresAt > block.timestamp, "already expired");
-
-        uid = system.hashBlake256(
-            abi.encodePacked(schemaUid, msg.sender, recipient, data, block.timestamp, attestationCount)
-        );
-
-        attestations[uid] = Attestation({
-            uid: uid,
-            schemaUid: schemaUid,
-            issuer: msg.sender,
-            recipient: recipient,
-            data: data,
-            issuedAt: block.timestamp,
-            expiresAt: expiresAt,
-            revoked: false,
-            refUid: refUid
-        });
-
-        receivedAttestations[recipient].push(uid);
-        issuedAttestations[msg.sender].push(uid);
-        schemaAttestations[schemaUid].push(uid);
-        attestationCount++;
-
-        emit AttestationCreated(uid, schemaUid, msg.sender, recipient);
+        return _attest(schemaUid, msg.sender, recipient, data, expiresAt, refUid);
     }
 
     /// @notice Issue attestation via sr25519 signature from a Substrate wallet
-    /// @dev Allows Polkadot.js/Talisman users to issue credentials without MetaMask
+    /// @dev Polkadot.js/Talisman users issue credentials without MetaMask.
+    ///      Replay protected via BLAKE2 signature hashing.
     function attestWithSr25519(
         uint8[64] calldata signature,
         bytes32 publicKey,
@@ -197,48 +285,118 @@ contract DotVerify is Ownable, ReentrancyGuard, Pausable {
         require(!usedSignatures[sigHash], "signature already used");
         usedSignatures[sigHash] = true;
 
-        uid = system.hashBlake256(
-            abi.encodePacked(schemaUid, msg.sender, recipient, data, block.timestamp, attestationCount)
-        );
-
-        attestations[uid] = Attestation({
-            uid: uid,
-            schemaUid: schemaUid,
-            issuer: msg.sender,
-            recipient: recipient,
-            data: data,
-            issuedAt: block.timestamp,
-            expiresAt: expiresAt,
-            revoked: false,
-            refUid: bytes32(0)
-        });
-
-        receivedAttestations[recipient].push(uid);
-        issuedAttestations[msg.sender].push(uid);
-        schemaAttestations[schemaUid].push(uid);
-        attestationCount++;
-
-        emit AttestationCreated(uid, schemaUid, msg.sender, recipient);
+        uid = _attest(schemaUid, msg.sender, recipient, data, expiresAt, bytes32(0));
         emit Sr25519AttestationIssued(uid, publicKey);
     }
 
-    /// @notice Revoke an attestation (only issuer, only if schema is revocable)
+    // =========================================================================
+    // Delegated Attestations
+    // =========================================================================
+
+    /// @notice Authorized delegates who can attest on behalf of an issuer
+    mapping(address => mapping(address => bool)) public delegates;
+
+    event DelegateAdded(address indexed issuer, address indexed delegate);
+    event DelegateRemoved(address indexed issuer, address indexed delegate);
+
+    function addDelegate(address delegate) external {
+        delegates[msg.sender][delegate] = true;
+        emit DelegateAdded(msg.sender, delegate);
+    }
+
+    function removeDelegate(address delegate) external {
+        delegates[msg.sender][delegate] = false;
+        emit DelegateRemoved(msg.sender, delegate);
+    }
+
+    /// @notice Issue attestation on behalf of another issuer (delegated)
+    function attestDelegated(
+        address issuer,
+        bytes32 schemaUid,
+        address recipient,
+        bytes calldata data,
+        uint256 expiresAt,
+        bytes32 refUid
+    ) external whenNotPaused returns (bytes32 uid) {
+        require(delegates[issuer][msg.sender], "not authorized delegate");
+        uid = _attest(schemaUid, issuer, recipient, data, expiresAt, refUid);
+        emit DelegatedAttestationIssued(uid, msg.sender, issuer);
+    }
+
+    // =========================================================================
+    // Revocation
+    // =========================================================================
+
     function revoke(bytes32 attestationUid) external {
         Attestation storage a = attestations[attestationUid];
         require(a.issuedAt > 0, "attestation not found");
-        require(a.issuer == msg.sender, "not issuer");
+        require(a.issuer == msg.sender || delegates[a.issuer][msg.sender], "not authorized");
         require(!a.revoked, "already revoked");
         require(schemas[a.schemaUid].revocable, "schema not revocable");
 
         a.revoked = true;
+
+        // Call resolver if schema has one
+        Schema storage s = schemas[a.schemaUid];
+        if (s.resolver != address(0)) {
+            ISchemaResolver(s.resolver).onRevoke(attestationUid, msg.sender);
+        }
+
         emit AttestationRevoked(attestationUid, msg.sender);
+    }
+
+    // =========================================================================
+    // Batch Operations
+    // =========================================================================
+
+    struct AttestationRequest {
+        bytes32 schemaUid;
+        address recipient;
+        bytes data;
+        uint256 expiresAt;
+        bytes32 refUid;
+    }
+
+    /// @notice Issue multiple attestations in one tx
+    function multiAttest(AttestationRequest[] calldata requests) external whenNotPaused returns (bytes32[] memory uids) {
+        uids = new bytes32[](requests.length);
+        for (uint256 i = 0; i < requests.length; i++) {
+            uids[i] = _attest(
+                requests[i].schemaUid,
+                msg.sender,
+                requests[i].recipient,
+                requests[i].data,
+                requests[i].expiresAt,
+                requests[i].refUid
+            );
+        }
+    }
+
+    /// @notice Revoke multiple attestations in one tx
+    function multiRevoke(bytes32[] calldata attestationUids) external {
+        for (uint256 i = 0; i < attestationUids.length; i++) {
+            Attestation storage a = attestations[attestationUids[i]];
+            require(a.issuedAt > 0, "attestation not found");
+            require(a.issuer == msg.sender || delegates[a.issuer][msg.sender], "not authorized");
+            require(!a.revoked, "already revoked");
+            require(schemas[a.schemaUid].revocable, "schema not revocable");
+
+            a.revoked = true;
+
+            Schema storage s = schemas[a.schemaUid];
+            if (s.resolver != address(0)) {
+                ISchemaResolver(s.resolver).onRevoke(attestationUids[i], msg.sender);
+            }
+
+            emit AttestationRevoked(attestationUids[i], msg.sender);
+        }
     }
 
     // =========================================================================
     // Verification
     // =========================================================================
 
-    /// @notice Verify an attestation: exists, not revoked, not expired
+    /// @notice Verify attestation: exists, not revoked, not expired
     function verify(bytes32 attestationUid) external view returns (bool valid, Attestation memory a) {
         a = attestations[attestationUid];
         if (a.issuedAt == 0) return (false, a);
@@ -247,38 +405,59 @@ contract DotVerify is Ownable, ReentrancyGuard, Pausable {
         return (true, a);
     }
 
-    /// @notice Verify attestation data integrity using BLAKE2-256
-    /// @dev Recomputes hash of provided data and compares to stored UID
+    /// @notice Verify attestation data integrity via BLAKE2-256
     function verifyData(
         bytes32 attestationUid,
         bytes calldata originalData
     ) external view returns (bool valid) {
         Attestation storage a = attestations[attestationUid];
         require(a.issuedAt > 0, "attestation not found");
-        bytes32 recomputed = system.hashBlake256(
-            abi.encodePacked(a.schemaUid, a.issuer, a.recipient, originalData, a.issuedAt, attestationCount)
-        );
-        // Note: this is an approximate check — exact match requires original nonce
-        return keccak256(abi.encodePacked(a.data)) == keccak256(abi.encodePacked(originalData));
+        bytes32 recomputed = system.hashBlake256(originalData);
+        return recomputed == a.dataHash;
     }
 
-    /// @notice Get all attestations received by a user
+    /// @notice Check if attestation is valid AND data matches (combined verification)
+    function verifyFull(
+        bytes32 attestationUid,
+        bytes calldata originalData
+    ) external view returns (bool valid, bool dataIntact, Attestation memory a) {
+        a = attestations[attestationUid];
+        valid = a.issuedAt > 0 && !a.revoked && (a.expiresAt == 0 || a.expiresAt > block.timestamp);
+        dataIntact = valid && (system.hashBlake256(originalData) == a.dataHash);
+    }
+
+    /// @notice Batch verify multiple attestations
+    function multiVerify(bytes32[] calldata uids) external view returns (bool[] memory results) {
+        results = new bool[](uids.length);
+        for (uint256 i = 0; i < uids.length; i++) {
+            Attestation storage a = attestations[uids[i]];
+            results[i] = a.issuedAt > 0 && !a.revoked && (a.expiresAt == 0 || a.expiresAt > block.timestamp);
+        }
+    }
+
+    // =========================================================================
+    // Query Functions
+    // =========================================================================
+
     function getReceivedAttestations(address user) external view returns (bytes32[] memory) {
         return receivedAttestations[user];
     }
 
-    /// @notice Get all attestations issued by a user
     function getIssuedAttestations(address issuer) external view returns (bytes32[] memory) {
         return issuedAttestations[issuer];
     }
 
-    /// @notice Get all attestations under a schema
     function getSchemaAttestations(bytes32 schemaUid) external view returns (bytes32[] memory) {
         return schemaAttestations[schemaUid];
     }
 
+    function isAttestationValid(bytes32 uid) external view returns (bool) {
+        Attestation storage a = attestations[uid];
+        return a.issuedAt > 0 && !a.revoked && (a.expiresAt == 0 || a.expiresAt > block.timestamp);
+    }
+
     // =========================================================================
-    // XCM Cross-Chain Attestation Queries
+    // XCM Cross-Chain Operations
     // =========================================================================
 
     /// @notice Send attestation status to another parachain via XCM
@@ -292,7 +471,7 @@ contract DotVerify is Ownable, ReentrancyGuard, Pausable {
         emit XcmAttestationQuery(attestationUid, destination);
     }
 
-    /// @notice Execute XCM locally with weight estimation
+    /// @notice Execute XCM locally with 10% weight safety margin
     function executeXcmLocal(bytes calldata message) external whenNotPaused nonReentrant {
         IXcm.Weight memory estimated = xcm.weighMessage(message);
         estimated.refTime = estimated.refTime * 11 / 10;
@@ -300,7 +479,7 @@ contract DotVerify is Ownable, ReentrancyGuard, Pausable {
         xcm.execute(message, estimated);
     }
 
-    /// @notice Estimate XCM weight for cross-chain attestation query
+    /// @notice Estimate XCM weight
     function estimateXcmWeight(bytes calldata message) external view returns (IXcm.Weight memory) {
         return xcm.weighMessage(message);
     }
@@ -309,17 +488,17 @@ contract DotVerify is Ownable, ReentrancyGuard, Pausable {
     // PVM System Precompile Features
     // =========================================================================
 
-    /// @notice Resolve EVM address to Polkadot AccountId32 for issuer identity
-    function resolveIssuerIdentity(address issuer) external returns (bytes memory accountId) {
+    /// @notice Resolve EVM address to Polkadot AccountId32
+    function resolveIssuerIdentity(address issuer) external returns (bytes memory) {
         return system.toAccountId(issuer);
     }
 
-    /// @notice Convert ECDSA pubkey to ETH address for cross-ecosystem identity
+    /// @notice Convert ECDSA pubkey to ETH address
     function ecdsaToAddress(uint8[33] calldata publicKey) external view returns (address) {
         return address(system.ecdsaToEthAddress(publicKey));
     }
 
-    /// @notice Get remaining execution weight
+    /// @notice Get remaining 2D execution weight
     function getRemainingWeight() external view returns (uint64 refTime, uint64 proofSize) {
         return system.weightLeft();
     }
@@ -339,7 +518,12 @@ contract DotVerify is Ownable, ReentrancyGuard, Pausable {
         return ISystem(SYSTEM_ADDR).hashBlake256(data);
     }
 
-    /// @notice Get code hash for integrity verification
+    /// @notice Hash data with BLAKE2-128 (Substrate storage key format)
+    function blake2Hash128(bytes calldata data) external pure returns (bytes32) {
+        return ISystem(SYSTEM_ADDR).hashBlake128(data);
+    }
+
+    /// @notice Get contract code hash for integrity verification
     function getCodeHash() external view returns (bytes32) {
         return system.ownCodeHash();
     }

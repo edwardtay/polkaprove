@@ -13,7 +13,7 @@ const QUICK_QUERIES = [
 export function AiChat({ address }: { address?: `0x${string}` }) {
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
-  const { messages, isLoading, sendMessage } = useAgent();
+  const { messages, isLoading, send } = useAgent();
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -29,7 +29,7 @@ export function AiChat({ address }: { address?: `0x${string}` }) {
       ? `[Connected wallet: ${address}]\n\n${msg}`
       : msg;
 
-    sendMessage(contextMsg);
+    send(contextMsg);
     setInput("");
   }
 
