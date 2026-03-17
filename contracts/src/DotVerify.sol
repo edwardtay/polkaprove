@@ -529,6 +529,57 @@ contract DotVerify is Ownable, ReentrancyGuard, Pausable {
     }
 
     // =========================================================================
+    // Off-chain Attestations (on-chain anchoring)
+    // =========================================================================
+
+    /// @notice Store only the BLAKE2 hash of an off-chain attestation (cheap)
+    /// @dev The full attestation data lives off-chain (IPFS, server, etc).
+    ///      Only the hash is stored on-chain for integrity verification.
+    mapping(bytes32 => OffchainAnchor) public offchainAnchors;
+
+    struct OffchainAnchor {
+        bytes32 dataHash;      // BLAKE2-256 of the full off-chain attestation
+        address issuer;
+        uint256 anchoredAt;
+        bool revoked;
+    }
+
+    event OffchainAnchored(bytes32 indexed anchorId, address indexed issuer, bytes32 dataHash);
+    event OffchainRevoked(bytes32 indexed anchorId, address indexed revoker);
+
+    /// @notice Anchor an off-chain attestation by storing its BLAKE2 hash
+    function anchorOffchain(bytes calldata offchainData) external whenNotPaused returns (bytes32 anchorId) {
+        bytes32 dataHash = system.hashBlake256(offchainData);
+        anchorId = system.hashBlake256(abi.encodePacked(msg.sender, dataHash, block.timestamp));
+
+        offchainAnchors[anchorId] = OffchainAnchor({
+            dataHash: dataHash,
+            issuer: msg.sender,
+            anchoredAt: block.timestamp,
+            revoked: false
+        });
+
+        emit OffchainAnchored(anchorId, msg.sender, dataHash);
+    }
+
+    /// @notice Verify an off-chain attestation against its anchor
+    function verifyOffchain(bytes32 anchorId, bytes calldata offchainData) external view returns (bool valid, bool dataMatch) {
+        OffchainAnchor storage anchor = offchainAnchors[anchorId];
+        valid = anchor.anchoredAt > 0 && !anchor.revoked;
+        dataMatch = valid && (system.hashBlake256(offchainData) == anchor.dataHash);
+    }
+
+    /// @notice Revoke an off-chain attestation anchor
+    function revokeOffchain(bytes32 anchorId) external {
+        OffchainAnchor storage anchor = offchainAnchors[anchorId];
+        require(anchor.anchoredAt > 0, "anchor not found");
+        require(anchor.issuer == msg.sender, "not issuer");
+        require(!anchor.revoked, "already revoked");
+        anchor.revoked = true;
+        emit OffchainRevoked(anchorId, msg.sender);
+    }
+
+    // =========================================================================
     // Admin
     // =========================================================================
 

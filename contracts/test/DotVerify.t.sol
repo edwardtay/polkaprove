@@ -643,6 +643,87 @@ contract DotVerifyTest is Test {
     }
 
     // =========================================================================
+    // Off-chain Attestation Tests
+    // =========================================================================
+
+    function test_anchorOffchain() public {
+        _mockBlakeUnique();
+        vm.prank(alice);
+        bytes32 anchorId = dv.anchorOffchain(abi.encode("off-chain credential data"));
+        assertTrue(anchorId != bytes32(0));
+
+        (bytes32 dataHash, address issuer, uint256 anchoredAt, bool revoked) = dv.offchainAnchors(anchorId);
+        assertEq(issuer, alice);
+        assertTrue(anchoredAt > 0);
+        assertFalse(revoked);
+        assertTrue(dataHash != bytes32(0));
+    }
+
+    function test_verifyOffchain_valid() public {
+        _mockBlakeUnique();
+        vm.prank(alice);
+        bytes memory data = abi.encode("off-chain credential data");
+        bytes32 anchorId = dv.anchorOffchain(data);
+
+        (bool valid, bool dataMatch) = dv.verifyOffchain(anchorId, data);
+        assertTrue(valid);
+        assertTrue(dataMatch);
+    }
+
+    function test_verifyOffchain_wrongData() public {
+        // Use a specific hash for anchoring
+        bytes32 anchorHash = keccak256(abi.encodePacked("anchor-hash"));
+        bytes32 dataHash = keccak256(abi.encodePacked("data-hash"));
+
+        // Mock: first call (hash offchainData) returns dataHash,
+        //       second call (hash anchorId components) returns anchorHash
+        // Since mockCall matches any call to hashBlake256, we rely on it returning the same value.
+        // We need distinct hashes for anchor vs verify, so we use clearMockedCalls approach.
+
+        // For anchoring: both hashBlake256 calls return the same mock value
+        _mockBlake(dataHash);
+        vm.prank(alice);
+        bytes memory originalData = abi.encode("original data");
+        bytes32 anchorId = dv.anchorOffchain(originalData);
+
+        // For verification with wrong data: hashBlake256 returns a different value
+        bytes32 wrongHash = keccak256(abi.encodePacked("wrong-data-hash"));
+        _mockBlake(wrongHash);
+
+        (bool valid, bool dataMatch) = dv.verifyOffchain(anchorId, abi.encode("wrong data"));
+        // valid is true (anchor exists and not revoked), but dataMatch is false
+        // because the mock returns wrongHash which != dataHash stored in anchor
+        assertTrue(valid);
+        assertFalse(dataMatch);
+    }
+
+    function test_revokeOffchain() public {
+        _mockBlakeUnique();
+        vm.prank(alice);
+        bytes32 anchorId = dv.anchorOffchain(abi.encode("data"));
+
+        vm.prank(alice);
+        dv.revokeOffchain(anchorId);
+
+        (, , , bool revoked) = dv.offchainAnchors(anchorId);
+        assertTrue(revoked);
+
+        // Verify returns invalid after revocation
+        (bool valid, ) = dv.verifyOffchain(anchorId, abi.encode("data"));
+        assertFalse(valid);
+    }
+
+    function test_revokeOffchain_notIssuer_reverts() public {
+        _mockBlakeUnique();
+        vm.prank(alice);
+        bytes32 anchorId = dv.anchorOffchain(abi.encode("data"));
+
+        vm.prank(bob);
+        vm.expectRevert("not issuer");
+        dv.revokeOffchain(anchorId);
+    }
+
+    // =========================================================================
     // Fuzz Tests
     // =========================================================================
 

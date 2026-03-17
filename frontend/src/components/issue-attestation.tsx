@@ -134,6 +134,15 @@ export function IssueAttestation({ address }: { address?: `0x${string}` }) {
             }}
           />
 
+          {/* Empty state guidance */}
+          {!schemaUid && (
+            <div className="border border-dashed border-border rounded-lg p-4 bg-muted/5">
+              <p className="text-xs text-muted-foreground">
+                Start by selecting a credential type above. If you don&apos;t see any templates, create one in the Templates tab first.
+              </p>
+            </div>
+          )}
+
           {/* Recipient */}
           <div>
             <label className="text-[11px] font-medium text-muted-foreground block mb-1">Who is this credential for?</label>

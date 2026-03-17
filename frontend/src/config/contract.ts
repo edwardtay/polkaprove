@@ -391,6 +391,34 @@ export const DOTVERIFY_ABI = [
     inputs: [{ name: "data", type: "bytes" }],
     outputs: [{ name: "", type: "bytes32" }],
   },
+  // Off-chain Anchoring
+  {
+    name: "anchorOffchain",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "data", type: "bytes" }],
+    outputs: [{ name: "anchorId", type: "bytes32" }],
+  },
+  {
+    name: "verifyOffchain",
+    type: "function",
+    stateMutability: "view",
+    inputs: [
+      { name: "anchorId", type: "bytes32" },
+      { name: "data", type: "bytes" },
+    ],
+    outputs: [
+      { name: "valid", type: "bool" },
+      { name: "dataMatch", type: "bool" },
+    ],
+  },
+  {
+    name: "revokeOffchain",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "anchorId", type: "bytes32" }],
+    outputs: [],
+  },
   // Events
   {
     name: "SchemaRegistered",

@@ -8,7 +8,7 @@
 ![Foundry](https://img.shields.io/badge/Foundry-DEA584?style=flat)
 
 **Live Demo:** [dotverify.vercel.app](https://dotverify.vercel.app)
-**Contract:** [`0xC3B8399Cd69EC199eD663Ee281d2094dbA48EF7d`](https://blockscout-testnet.polkadot.io/address/0xC3B8399Cd69EC199eD663Ee281d2094dbA48EF7d) on Polkadot Hub Testnet
+**Contract:** [`0x9FC85713c0764eadA3c60DeB12687101971f8d45`](https://blockscout-testnet.polkadot.io/address/0x9FC85713c0764eadA3c60DeB12687101971f8d45) on Polkadot Hub Testnet
 
 ---
 
