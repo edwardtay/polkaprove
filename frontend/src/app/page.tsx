@@ -34,7 +34,7 @@ export default function LandingPage() {
             <span className="text-[#E6007A]">On Polkadot.</span>
           </h1>
           <p className="text-sm text-muted-foreground max-w-md mx-auto mb-8">
-            Prove your Binance trades, OKX KYC, TikTok balance, and more — privately, on Polkadot Hub.
+            Privately prove things about yourself on-chain — your finances, identity, and credentials — without exposing sensitive data.
           </p>
 
           <Link
