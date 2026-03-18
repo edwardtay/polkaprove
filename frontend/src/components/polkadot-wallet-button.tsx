@@ -17,7 +17,7 @@ export function PolkadotWalletButton() {
           onClick={() => setShowDropdown(!showDropdown)}
         >
           <span className="w-2 h-2 rounded-full bg-[#E6007A]" />
-          <span className="font-mono">{selectedAccount.name || short}</span>
+          <span className="font-mono">{short}</span>
         </button>
 
         {showDropdown && (
