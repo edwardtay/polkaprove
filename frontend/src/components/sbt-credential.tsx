@@ -22,7 +22,7 @@ type MintStep = "select" | "minting" | "done";
 
 export function SbtCredential() {
   const { address } = useAccount();
-  const [selectedProof, setSelectedProof] = useState<{ txHash: string; summary: string; type: string } | null>(null);
+  const [selectedProof, setSelectedProof] = useState<{ txHash: string; anchorId?: string; summary: string; type: string } | null>(null);
   const [credentialType, setCredentialType] = useState("kyc");
   const [step, setStep] = useState<MintStep>("select");
 
@@ -45,13 +45,14 @@ export function SbtCredential() {
 
   function handleMint() {
     if (!selectedProof || !DOTVERIFY_ADDRESS) return;
+    const id = selectedProof.anchorId || selectedProof.txHash;
+    if (!id) return;
     setStep("minting");
-    // Use the txHash as anchorId (in practice this should be the actual anchorId from event logs)
     writeContract({
       address: DOTVERIFY_ADDRESS,
       abi: DOTVERIFY_ABI,
       functionName: "mintSBT",
-      args: [selectedProof.txHash as `0x${string}`, credentialType],
+      args: [id as `0x${string}`, credentialType],
     });
   }
 

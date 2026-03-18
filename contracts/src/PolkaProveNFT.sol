@@ -49,9 +49,13 @@ contract PolkaProveNFT {
         return string(abi.encodePacked(baseURI, _toString(tokenId)));
     }
 
+    mapping(uint256 => bool) public registered;
+
     function register(uint256 tokenId) external {
+        require(!registered[tokenId], "already registered");
         (address holder,,,) = polkaProve.soulboundTokens(tokenId);
         require(holder != address(0), "nonexistent");
+        registered[tokenId] = true;
         emit Transfer(address(0), holder, tokenId);
     }
 

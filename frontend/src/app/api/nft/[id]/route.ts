@@ -1,7 +1,7 @@
 import { encodeFunctionData, decodeFunctionResult, type Hex } from "viem";
 
 const RPC = "https://eth-rpc-testnet.polkadot.io";
-const POLKAPROVE = "0x5f7D3BF531C2DcF0d7dd791BA38dEE36Dc9A8C9E";
+const POLKAPROVE = process.env.NEXT_PUBLIC_DOTVERIFY_ADDRESS || "0x5f7D3BF531C2DcF0d7dd791BA38dEE36Dc9A8C9E";
 
 const ABI = [
   {

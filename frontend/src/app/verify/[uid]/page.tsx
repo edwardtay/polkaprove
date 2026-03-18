@@ -68,7 +68,7 @@ export default function VerifyPage() {
                     </svg>
                   </span>
                   <span className="text-[11px] font-bold text-green-700 uppercase tracking-wide">
-                    Anchored on Polkadot Hub
+                    Anchor Exists on Polkadot Hub
                   </span>
                 </div>
               ) : anchorValid === false ? (

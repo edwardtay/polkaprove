@@ -6,8 +6,8 @@ import { toHex } from "viem";
 import { DOTVERIFY_ABI, DOTVERIFY_ADDRESS } from "@/config/contract";
 
 // zkTLS runs client-side — the JS SDK opens browser popups for user auth
-const APP_ID = "0x4f54bf97c50d2967a9ef769b94c858580d0234db";
-const APP_SECRET = "0x7f013a5900a0c4725f862acc055aad66d3a9c3e3aee7d651eae7026d1730acdd";
+const APP_ID = process.env.NEXT_PUBLIC_PRIMUS_APP_ID || "0x4f54bf97c50d2967a9ef769b94c858580d0234db";
+const APP_SECRET = process.env.NEXT_PUBLIC_PRIMUS_APP_SECRET || "0x7f013a5900a0c4725f862acc055aad66d3a9c3e3aee7d651eae7026d1730acdd";
 
 type ZkTlsFlow = "idle" | "config" | "init" | "attesting" | "preview" | "anchoring" | "success" | "error";
 
@@ -65,7 +65,7 @@ export function ZkTlsProve() {
   const [conditionValue, setConditionValue] = useState("");
 
   const { writeContract, data: txHash, isPending } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash: txHash });
+  const { isLoading: isConfirming, isSuccess, data: receipt } = useWaitForTransactionReceipt({ hash: txHash });
 
   function handleSelectTemplate(templateId: string) {
     if (!address) return;
@@ -156,6 +156,9 @@ export function ZkTlsProve() {
     });
   }
 
+  // Extract anchorId from receipt logs (OffchainAnchored event topic[1])
+  const anchorId = receipt?.logs?.[0]?.topics?.[1] || null;
+
   if (isSuccess && flow === "anchoring") {
     setFlow("success");
     try {
@@ -168,6 +171,7 @@ export function ZkTlsProve() {
       }
       existing.push({
         type: `zktls-${selectedTemplate}`,
+        anchorId: anchorId || undefined,
         txHash,
         timestamp: Date.now(),
         summary: summaryParts.join(" "),
