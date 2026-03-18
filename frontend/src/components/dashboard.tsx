@@ -1,31 +1,21 @@
 "use client";
 
 import { useState } from "react";
-import { useAccount } from "wagmi";
 import { motion, AnimatePresence } from "framer-motion";
-import { SchemaRegistry } from "./schema-registry";
-import { IssuePage } from "./issue-page";
-import { VerifyPage } from "./verify-page";
-import { Explorer } from "./explorer";
-import { IssuerDashboard } from "./issuer-dashboard";
-import { PvmExplorer } from "./pvm-explorer";
-import { AiChat } from "./ai-chat";
+import { ProveTab } from "./prove-tab";
+import { MyProofsTab } from "./my-proofs-tab";
+import { VerifyTab } from "./verify-tab";
 
 const TABS = [
-  { id: "Schemas", label: "Templates", icon: "◈" },
-  { id: "Issue", label: "Issue", icon: "✦" },
-  { id: "Verify", label: "Verify", icon: "✓" },
-  { id: "Explorer", label: "Browse", icon: "◎" },
-  { id: "Issuers", label: "Issuers", icon: "⇄" },
-  { id: "PVM", label: "Tech", icon: "⬡" },
-  { id: "AI", label: "AI", icon: "●" },
+  { id: "Prove", label: "Prove", icon: "\u25C8" },
+  { id: "MyProofs", label: "My Proofs", icon: "\u25CE" },
+  { id: "Verify", label: "Verify", icon: "\u2713" },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
 
 export function Dashboard() {
-  const [activeTab, setActiveTab] = useState<TabId>("Schemas");
-  const { address } = useAccount();
+  const [activeTab, setActiveTab] = useState<TabId>("Prove");
 
   return (
     <div>
@@ -54,13 +44,9 @@ export function Dashboard() {
           exit={{ opacity: 0, y: -8 }}
           transition={{ duration: 0.15 }}
         >
-          {activeTab === "Schemas" && <SchemaRegistry />}
-          {activeTab === "Issue" && <IssuePage address={address} />}
-          {activeTab === "Verify" && <VerifyPage />}
-          {activeTab === "Explorer" && <Explorer address={address} />}
-          {activeTab === "Issuers" && <IssuerDashboard />}
-          {activeTab === "PVM" && <PvmExplorer />}
-          {activeTab === "AI" && <AiChat address={address} />}
+          {activeTab === "Prove" && <ProveTab />}
+          {activeTab === "MyProofs" && <MyProofsTab />}
+          {activeTab === "Verify" && <VerifyTab />}
         </motion.div>
       </AnimatePresence>
     </div>

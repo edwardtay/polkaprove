@@ -31,11 +31,11 @@ export default function LandingPage() {
         {/* Hero */}
         <section className="px-4 pt-16 sm:pt-24 pb-10 max-w-3xl mx-auto text-center">
           <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight leading-tight mb-3">
-            Verifiable Credentials.{" "}
+            Prove Your Polkadot Activity.{" "}
             <span className="text-[#E6007A]">On-Chain.</span>
           </h1>
           <p className="text-sm text-muted-foreground max-w-md mx-auto mb-6">
-            Issue, verify, and share tamper-proof credentials on Polkadot.
+            Anchor verifiable proofs of your staking, governance, portfolio, and identity on Polkadot Hub.
           </p>
 
           <div className="max-w-lg mx-auto flex gap-2">
@@ -44,7 +44,7 @@ export default function LandingPage() {
               value={verifyUid}
               onChange={(e) => setVerifyUid(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && verifyUid && router.push(`/verify/${verifyUid}`)}
-              placeholder="Paste a credential ID to verify..."
+              placeholder="Paste a credential or anchor ID to verify..."
               className="flex-1 border border-border rounded-lg px-3 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#E6007A]/30 focus:border-[#E6007A]"
             />
             <button
@@ -68,18 +68,19 @@ export default function LandingPage() {
           </Link>
         </section>
 
-        {/* What you can do */}
+        {/* Use cases — matches proof types */}
         <section className="px-4 pb-12 max-w-5xl mx-auto">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
-              { icon: "🎓", label: "Diplomas" },
-              { icon: "🏛", label: "DAO Membership" },
-              { icon: "🚀", label: "Certifications" },
-              { icon: "✓", label: "KYC" },
+              { icon: "\u{1F4B0}", label: "Portfolio", desc: "Cross-chain balances" },
+              { icon: "\u{1F512}", label: "Staking", desc: "DOT staking & rewards" },
+              { icon: "\u{1F5F3}", label: "Governance", desc: "OpenGov voting history" },
+              { icon: "\u{1F464}", label: "Identity", desc: "On-chain identity proof" },
             ].map((uc) => (
-              <div key={uc.label} className="border border-border rounded-lg p-3 text-center">
-                <span className="text-lg block mb-1">{uc.icon}</span>
-                <span className="text-[11px] font-medium">{uc.label}</span>
+              <div key={uc.label} className="border border-border rounded-xl p-4 text-center">
+                <span className="text-xl block mb-1.5">{uc.icon}</span>
+                <span className="text-[11px] font-medium block">{uc.label}</span>
+                <span className="text-[10px] text-muted-foreground">{uc.desc}</span>
               </div>
             ))}
           </div>
