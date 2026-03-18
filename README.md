@@ -91,7 +91,7 @@ polkaProve.hasCredential(userAddress, "kyc") // → true/false
 
 ## Smart Contract
 
-**[`PolkaProve.sol`](contracts/src/DotVerify.sol)** — deployed and verified on Polkadot Hub Testnet.
+**[`DotVerify.sol`](contracts/src/DotVerify.sol)** (contract name: PolkaProve) — deployed and verified on Polkadot Hub Testnet.
 
 ```solidity
 // zkTLS proof anchoring

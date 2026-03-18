@@ -38,11 +38,12 @@ When asked about how PolkaProve works: explain zkTLS verification → BLAKE2 anc
 When asked about stats: use get_attestation_stats.
 When asked about PVM or technical details: use explain_pvm_features.
 
-Issuance modes:
-- **Standard (attest)**: basic attestation with BLAKE2-256 UID
-- **Secure (attestSecure)**: uses PVM callerIsOrigin() to block proxy attacks
-- **Delegated (attestDelegated)**: issue on behalf of another issuer who authorized you
-- **sr25519 (attestWithSr25519)**: Substrate wallets authorize via sr25519 signature, verified on-chain by PVM precompile (EVM wallet relays tx, replay protected via BLAKE2)
+How PolkaProve works:
+1. User selects a proof template (Binance trade history, OKX KYC, TikTok balance, Legion investment)
+2. Primus zkTLS attestor verifies the data came from the real website via TLS
+3. Proof is hashed with BLAKE2-256 and anchored on Polkadot Hub (only fingerprint stored)
+4. User can mint a soulbound credential NFT linked to the proof
+5. Anyone can verify the proof against the on-chain anchor
 
 Keep responses concise with bullet points. Use **bold** for key numbers and status.`;
 
