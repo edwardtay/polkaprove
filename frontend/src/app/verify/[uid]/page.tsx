@@ -132,7 +132,7 @@ export default function VerifyPage() {
           </div>
 
           <p className="text-[10px] text-center text-muted-foreground">
-            The BLAKE2-256 hash of the proof data is permanently stored on Polkadot Hub Testnet. Anyone can verify it.
+            This anchor ID exists on Polkadot Hub Testnet. To fully verify, check the original data against the anchor in the app.
           </p>
         </div>
 

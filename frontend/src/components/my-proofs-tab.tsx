@@ -32,7 +32,10 @@ export function MyProofsTab() {
   }, [address]);
 
   function handleShare(proof: ProofRecord) {
-    const url = `https://blockscout-testnet.polkadot.io/tx/${proof.txHash}`;
+    // Share anchor ID if available, otherwise tx hash on Blockscout
+    const url = proof.anchorId
+      ? `${window.location.origin}/verify/${proof.anchorId}`
+      : `https://blockscout-testnet.polkadot.io/tx/${proof.txHash}`;
     navigator.clipboard.writeText(url);
     setCopiedId(proof.txHash);
     setTimeout(() => setCopiedId(null), 2000);
@@ -97,9 +100,14 @@ export function MyProofsTab() {
                   <div className="min-w-0">
                     <p className="text-[11px] font-medium text-muted-foreground">{meta.label}</p>
                     <p className="text-sm font-medium mt-0.5 truncate">{proof.summary}</p>
-                    <p className="text-[10px] text-muted-foreground mt-1 font-mono truncate" title={proof.txHash}>
-                      Tx: {proof.txHash}
-                    </p>
+                    {proof.anchorId && (
+                      <p className="text-[10px] text-muted-foreground mt-1 font-mono truncate" title={proof.anchorId}>
+                        Anchor: {proof.anchorId.slice(0, 18)}...
+                      </p>
+                    )}
+                    <a href={`https://blockscout-testnet.polkadot.io/tx/${proof.txHash}`} target="_blank" rel="noopener noreferrer" className="text-[10px] text-muted-foreground mt-0.5 font-mono truncate block hover:text-[#E6007A]" title={proof.txHash}>
+                      Tx: {proof.txHash.slice(0, 18)}...
+                    </a>
                     <p className="text-[10px] text-muted-foreground mt-0.5">
                       {new Date(proof.timestamp).toLocaleString(undefined, {
                         year: "numeric",

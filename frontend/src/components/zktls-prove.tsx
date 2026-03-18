@@ -6,9 +6,11 @@ import { toHex } from "viem";
 import { DOTVERIFY_ABI, DOTVERIFY_ADDRESS } from "@/config/contract";
 
 // Primus JS SDK runs client-side by design — appId/appSecret are project identifiers
-// (not traditional secrets). See: https://docs.primuslabs.xyz/build/for-dapp/example
-const APP_ID = process.env.NEXT_PUBLIC_PRIMUS_APP_ID || "0x4f54bf97c50d2967a9ef769b94c858580d0234db";
-const APP_SECRET = process.env.NEXT_PUBLIC_PRIMUS_APP_SECRET || "0x7f013a5900a0c4725f862acc055aad66d3a9c3e3aee7d651eae7026d1730acdd";
+// per Primus docs: https://docs.primuslabs.xyz/build/for-dapp/example
+// "appSecret cannot be written in the front-end code" — but the JS SDK requires it client-side.
+// This is a known Primus SDK limitation. In production, use a server-side proxy.
+const APP_ID = process.env.NEXT_PUBLIC_PRIMUS_APP_ID || "";
+const APP_SECRET = process.env.NEXT_PUBLIC_PRIMUS_APP_SECRET || "";
 
 type ZkTlsFlow = "idle" | "config" | "init" | "attesting" | "preview" | "anchoring" | "success" | "error";
 
@@ -87,6 +89,7 @@ export function ZkTlsProve() {
       const { PrimusZKTLS } = await import("@primuslabs/zktls-js-sdk");
 
       const primusZKTLS = new PrimusZKTLS();
+      if (!APP_ID || !APP_SECRET) throw new Error("Primus credentials not configured. Set NEXT_PUBLIC_PRIMUS_APP_ID and NEXT_PUBLIC_PRIMUS_APP_SECRET.");
       await primusZKTLS.init(APP_ID, APP_SECRET);
       setFlow("attesting");
 
