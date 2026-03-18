@@ -166,12 +166,15 @@ function isDirectCaller() → bool
 function getMinimumBalance() → uint256
 ```
 
-### Security
-- OpenZeppelin `Ownable`, `ReentrancyGuard`, `Pausable`
+### Security (Built with OpenZeppelin)
+- **OpenZeppelin Ownable** — owner-only admin functions (pause/unpause)
+- **OpenZeppelin ReentrancyGuard** — prevents reentrancy on XCM and state-changing functions
+- **OpenZeppelin Pausable** — emergency circuit breaker for the entire protocol
 - sr25519 replay prevention via BLAKE2 signature hashing
 - callerIsOrigin blocks proxy/relay attacks on `attestSecure()`
 - Schema resolvers: custom hooks that can accept/reject attestations and revocations
 - Delegated attestations: authorized delegates can attest/revoke on behalf of issuers
+- Schema-level revocability control (permanent credentials can never be revoked)
 - Schema-level revocability control (permanent credentials can never be revoked)
 
 ### Test Results
@@ -246,7 +249,7 @@ dotverify/
 | Layer | Technology |
 |-------|-----------|
 | **Chain** | Polkadot Hub Testnet (Chain ID: 420420417) |
-| **Contracts** | Solidity 0.8.26, Foundry, OpenZeppelin, PVM Precompiles |
+| **Contracts** | Solidity 0.8.26, Foundry, **OpenZeppelin** (Ownable, ReentrancyGuard, Pausable), PVM Precompiles |
 | **Frontend** | Next.js 16, React 19, wagmi, viem, RainbowKit, Polkadot.js, Tailwind |
 | **AI** | Multi-provider (Claude / Llama / Cerebras) with 5 tool functions |
 
