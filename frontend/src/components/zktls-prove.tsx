@@ -16,8 +16,29 @@ const TEMPLATES = [
     id: "164fbfdb-5796-4a01-94f6-597f18b6ee01",
     icon: "🏦",
     label: "Legion Investment",
-    desc: "Prove your total invested amount on Legion",
+    desc: "Prove your total invested amount",
     source: "app.legion.cc",
+  },
+  {
+    id: "c25c9f6a-b816-4a67-86ab-7292eff209a3",
+    icon: "📊",
+    label: "Binance Trade History",
+    desc: "Prove your 30-day spot trading history",
+    source: "binance.com",
+  },
+  {
+    id: "555d729f-074a-4030-a188-469cd5fd8115",
+    icon: "🔶",
+    label: "OKX KYC Level",
+    desc: "Prove your KYC verification status",
+    source: "okx.com",
+  },
+  {
+    id: "6793c9e6-8412-4a22-b79e-6dda97930771",
+    icon: "🎵",
+    label: "TikTok Balance",
+    desc: "Prove your coin balance on TikTok",
+    source: "tiktok.com",
   },
 ];
 
