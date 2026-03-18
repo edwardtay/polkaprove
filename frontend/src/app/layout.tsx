@@ -7,7 +7,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: siteConfig.name,
   description: siteConfig.description,
-  icons: { icon: "/favicon.svg" },
+  icons: { icon: "/favicon.ico", apple: "/icon-192.png" },
 };
 
 export default function RootLayout({

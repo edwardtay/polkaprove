@@ -54,7 +54,7 @@ export function Navbar() {
     <header className="border-b border-border bg-white sticky top-0 z-50">
       <div className="flex items-center justify-between px-4 py-2.5 max-w-6xl mx-auto w-full">
         <Link href="/" className="flex items-center gap-1.5 text-sm font-bold tracking-tight">
-          <span className="inline-block w-2.5 h-2.5 rounded-full bg-[#E6007A]" />
+          <img src="/logo.png" alt="" className="w-5 h-5 rounded" />
           {siteConfig.name}
         </Link>
         <div className="flex items-center gap-2">
