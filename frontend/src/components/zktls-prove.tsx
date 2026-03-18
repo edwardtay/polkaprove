@@ -14,8 +14,7 @@ type ZkTlsFlow = "idle" | "config" | "init" | "attesting" | "preview" | "anchori
 const TEMPLATES = [
   {
     id: "164fbfdb-5796-4a01-94f6-597f18b6ee01",
-    icon: "L",
-    iconBg: "bg-purple-600",
+    logo: "/legion-logo.png",
     label: "Legion Investment",
     desc: "Prove your total invested amount",
     source: "app.legion.cc",
@@ -24,8 +23,7 @@ const TEMPLATES = [
   },
   {
     id: "c25c9f6a-b816-4a67-86ab-7292eff209a3",
-    icon: "B",
-    iconBg: "bg-yellow-500",
+    logo: "/binance-logo.png",
     label: "Binance Trade History",
     desc: "Prove your 30-day spot trading history",
     source: "binance.com",
@@ -34,8 +32,7 @@ const TEMPLATES = [
   },
   {
     id: "555d729f-074a-4030-a188-469cd5fd8115",
-    icon: "O",
-    iconBg: "bg-black",
+    logo: "/okx-logo.png",
     label: "OKX KYC Level",
     desc: "Prove your KYC verification status",
     source: "okx.com",
@@ -44,8 +41,7 @@ const TEMPLATES = [
   },
   {
     id: "6793c9e6-8412-4a22-b79e-6dda97930771",
-    icon: "T",
-    iconBg: "bg-pink-500",
+    logo: "/tiktok-logo.png",
     label: "TikTok Balance",
     desc: "Prove your coin balance on TikTok",
     source: "tiktok.com",
@@ -224,7 +220,7 @@ export function ZkTlsProve() {
               className="border border-border bg-white rounded-xl p-4 text-left hover:border-[#E6007A]/40 hover:shadow-sm transition-all disabled:opacity-40"
             >
               <div className="flex items-center gap-2 mb-1">
-                <span className={`w-6 h-6 rounded ${t.iconBg} text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0`}>{t.icon}</span>
+                <img src={t.logo} alt="" className="w-6 h-6 rounded flex-shrink-0" />
                 <span className="font-medium text-xs">{t.label}</span>
               </div>
               <p className="text-[10px] text-muted-foreground">{t.desc}</p>
@@ -239,7 +235,7 @@ export function ZkTlsProve() {
         <div className="space-y-4">
           <div className="bg-white border border-border rounded-xl p-4">
             <div className="flex items-center gap-2 mb-3">
-              <span className={`w-8 h-8 rounded ${template.iconBg} text-white text-xs font-bold flex items-center justify-center`}>{template.icon}</span>
+              <img src={template.logo} alt="" className="w-8 h-8 rounded" />
               <div>
                 <p className="font-medium text-sm">{template.label}</p>
                 <p className="text-[10px] text-muted-foreground">{template.source}</p>
