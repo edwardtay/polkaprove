@@ -398,7 +398,7 @@ export function ZkTlsProve() {
       {flow === "success" && txHash && (
         <div className="bg-white border border-green-200 rounded-xl p-4">
           <p className="text-sm font-medium text-green-700 mb-1">zkTLS Proof Anchored!</p>
-          <p className="font-mono text-[10px] text-green-600">Tx: {txHash}</p>
+          <a href={`https://blockscout-testnet.polkadot.io/tx/${txHash}`} target="_blank" rel="noopener noreferrer" className="font-mono text-[10px] text-green-600 underline hover:text-green-800 break-all block">Tx: {txHash}</a>
           <p className="text-[10px] text-muted-foreground mt-1">Verified by Primus attestor, anchored with BLAKE2-256 on Polkadot Hub.</p>
           {privacyMode && conditionValue && template && (
             <p className="text-[10px] text-[#E6007A] mt-1 font-medium">

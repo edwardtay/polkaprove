@@ -143,7 +143,7 @@ export function ProveTab() {
           {isCompositeSuccess && compositeTxHash && (
             <div className="bg-green-50 border border-green-200 rounded-xl p-3 mt-3">
               <p className="text-xs font-medium text-green-700">Composite Proof Anchored!</p>
-              <p className="font-mono text-[10px] text-green-600">Tx: {compositeTxHash}</p>
+              <a href={`https://blockscout-testnet.polkadot.io/tx/${compositeTxHash}`} target="_blank" rel="noopener noreferrer" className="font-mono text-[10px] text-green-600 underline hover:text-green-800 break-all block">Tx: {compositeTxHash}</a>
             </div>
           )}
         </div>
